@@ -2,11 +2,20 @@ package com.madroft.chancmg.crimecitycodes;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.ProgressDialog;
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.v7.widget.CardView;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.Toast;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.HashMap;
 
 import billing.IabHelper;
 import billing.IabResult;
@@ -14,14 +23,20 @@ import billing.Inventory;
 import billing.Purchase;
 
 /**
- * Created by Chan CMG on 11/19/2016.
+ * Created by Chan CMG on 11/14/2016.
  */
-public class donate extends Activity implements View.OnClickListener {
+public class addvip extends Activity {
 
+    // Debug tag, for logging
     static final String TAG = "mafia";
-    static final String SKU_TWO = "two_d", SKU_FIVE = "five_d", SKU_TEN = "ten_d", SKU_TWY = "twenty_d";
+    static final String SKU_GAS = "vip_pass";
     static final int RC_REQUEST = 10001;
-    CardView td, fd, tnd, twd;
+    // JSON Node names
+    private static final String TAG_SUCCESS = "success";
+    private static final String REGISTER_URL = "http://madroft.16mb.com/android_connect/add_vip.php";
+    static JSONObject jObj = null;
+    Button addvip;
+    EditText mafia;
     IabHelper mHelper;
     // Called when consumption is complete
     IabHelper.OnConsumeFinishedListener mConsumeFinishedListener = new IabHelper.OnConsumeFinishedListener() {
@@ -39,8 +54,8 @@ public class donate extends Activity implements View.OnClickListener {
                 // game world's logic, which in our case means filling the gas tank a bit
                 Log.d(TAG, "Consumption successful. Provisioning.");
 
-
-                alert("Thank you very much:-)");
+                RegisterUser ru = new RegisterUser();
+                ru.execute(mafia.getText().toString());
 
 
             } else {
@@ -67,36 +82,11 @@ public class donate extends Activity implements View.OnClickListener {
             Log.d(TAG, "Query inventory was successful.");
 
             // Check for gas delivery -- if we own gas, we should fill up the tank immediately
-            Purchase gasPurchase1 = inventory.getPurchase(SKU_TWO);
-            if (gasPurchase1 != null && verifyDeveloperPayload(gasPurchase1)) {
+            Purchase gasPurchase = inventory.getPurchase(SKU_GAS);
+            if (gasPurchase != null && verifyDeveloperPayload(gasPurchase)) {
                 Log.d(TAG, "We have gas. Consuming it.");
-                mHelper.consumeAsync(inventory.getPurchase(SKU_TWO), mConsumeFinishedListener);
+                mHelper.consumeAsync(inventory.getPurchase(SKU_GAS), mConsumeFinishedListener);
                 return;
-
-            }
-
-            Purchase gasPurchase2 = inventory.getPurchase(SKU_FIVE);
-            if (gasPurchase2 != null && verifyDeveloperPayload(gasPurchase2)) {
-                Log.d(TAG, "We have gas. Consuming it.");
-                mHelper.consumeAsync(inventory.getPurchase(SKU_FIVE), mConsumeFinishedListener);
-                return;
-
-            }
-
-            Purchase gasPurchase3 = inventory.getPurchase(SKU_TEN);
-            if (gasPurchase3 != null && verifyDeveloperPayload(gasPurchase3)) {
-                Log.d(TAG, "We have gas. Consuming it.");
-                mHelper.consumeAsync(inventory.getPurchase(SKU_TEN), mConsumeFinishedListener);
-                return;
-
-            }
-
-            Purchase gasPurchase4 = inventory.getPurchase(SKU_TWY);
-            if (gasPurchase4 != null && verifyDeveloperPayload(gasPurchase4)) {
-                Log.d(TAG, "We have gas. Consuming it.");
-                mHelper.consumeAsync(inventory.getPurchase(SKU_TWY), mConsumeFinishedListener);
-                return;
-
             }
         }
     };
@@ -121,44 +111,56 @@ public class donate extends Activity implements View.OnClickListener {
 
             Log.d(TAG, "Purchase successful.");
 
-            if (purchase.getSku().equals(SKU_TWO)) {
-                // bought 1/4 tank of gas. So consume it.
-                Log.d(TAG, "Purchase is gas. Starting gas consumption.");
-                mHelper.consumeAsync(purchase, mConsumeFinishedListener);
-            } else if (purchase.getSku().equals(SKU_FIVE)) {
-                // bought 1/4 tank of gas. So consume it.
-                Log.d(TAG, "Purchase is gas. Starting gas consumption.");
-                mHelper.consumeAsync(purchase, mConsumeFinishedListener);
-            } else if (purchase.getSku().equals(SKU_TEN)) {
-                // bought 1/4 tank of gas. So consume it.
-                Log.d(TAG, "Purchase is gas. Starting gas consumption.");
-                mHelper.consumeAsync(purchase, mConsumeFinishedListener);
-            } else if (purchase.getSku().equals(SKU_TWY)) {
+            if (purchase.getSku().equals(SKU_GAS)) {
                 // bought 1/4 tank of gas. So consume it.
                 Log.d(TAG, "Purchase is gas. Starting gas consumption.");
                 mHelper.consumeAsync(purchase, mConsumeFinishedListener);
             }
+
         }
     };
 
     @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        Log.d(TAG, "onActivityResult(" + requestCode + "," + resultCode + "," + data);
+        if (mHelper == null) return;
+
+        // Pass on the activity result to the helper for handling
+        if (!mHelper.handleActivityResult(requestCode, resultCode, data)) {
+            // not handled, so handle it ourselves (here's where you'd
+            // perform any handling of activity results not related to in-app
+            // billing...
+            super.onActivityResult(requestCode, resultCode, data);
+        } else {
+            Log.d(TAG, "onActivityResult handled by IABUtil.");
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // very important:
+        Log.d(TAG, "Destroying helper.");
+        if (mHelper != null) {
+            mHelper.dispose();
+            mHelper = null;
+        }
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.donate);
+        setContentView(R.layout.addvip);
 
-        td = (CardView) findViewById(R.id.twod);
-        fd = (CardView) findViewById(R.id.fived);
-        tnd = (CardView) findViewById(R.id.tend);
-        twd = (CardView) findViewById(R.id.twd);
-
-
-        //init purchase
+        addvip = (Button) findViewById(R.id.btnCreatevip);
+        mafia = (EditText) findViewById(R.id.inputvip);
 
         String base64EncodedPublicKey = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArb5/94rvqJ1Is0zu+3BBMz/kTF3J5ChjTJ9Jf3vLun13CWOKp/kOW6t3k1QBzf4cg95itA6RXmpi1DDgibeYltTFADaPSA9mqV7CA/Bh+CPgKqcWyQy05JcrWuFtbNTojiyHPZOoXBQl8ZTADjWXMRsX95V9kzWef3Bj7pfJYuXqmmWSH+gKwe5qfx0kWK4rJw62PZ7TXxtXqKOV4+c/e4sYp//u4wZTuTtC0nPWFLpLwcKTjK2nJJYT7ceXzj9sI10FeX4uIjCYBPRhNIeaAzAfeBQ1vQT3ODzrNpoXwD6azIXoXSmMgLaBBab8e0az1AydThh5a9PbRJiHaJP06wIDAQAB";
 
         Log.d(TAG, "Creating IAB helper.");
         mHelper = new IabHelper(this, base64EncodedPublicKey);
         mHelper.enableDebugLogging(true);
+
 
         Log.d(TAG, "Starting setup.");
         mHelper.startSetup(new IabHelper.OnIabSetupFinishedListener() {
@@ -180,30 +182,33 @@ public class donate extends Activity implements View.OnClickListener {
             }
         });
 
-        //card listeners
-
-        td.setOnClickListener(this);
-        fd.setOnClickListener(this);
-        tnd.setOnClickListener(this);
-        twd.setOnClickListener(this);
+        addvip.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String m = mafia.getText().toString();
+                if (!m.isEmpty() && m.length() == 9) {
+                    onaddbuttonclicked(v);
+                } else {
+                    Toast.makeText(getApplicationContext(), "Enter valid mafia", Toast.LENGTH_LONG).show();
+                }
+            }
+        });
 
 
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        Log.d(TAG, "onActivityResult(" + requestCode + "," + resultCode + "," + data);
-        if (mHelper == null) return;
+    void onaddbuttonclicked(View args) {
+        Log.d(TAG, "Buy vip button clicked.");
 
-        // Pass on the activity result to the helper for handling
-        if (!mHelper.handleActivityResult(requestCode, resultCode, data)) {
-            // not handled, so handle it ourselves (here's where you'd
-            // perform any handling of activity results not related to in-app
-            // billing...
-            super.onActivityResult(requestCode, resultCode, data);
-        } else {
-            Log.d(TAG, "onActivityResult handled by IABUtil.");
-        }
+        Log.d(TAG, "Launching purchase flow for gas.");
+
+        /* TODO: for security, generate your payload here for verification. See the comments on
+         *        verifyDeveloperPayload() for more info. Since this is a SAMPLE, we just use
+         *        an empty string, but on a production app you should carefully generate this. */
+        String payload = "";
+
+        mHelper.launchPurchaseFlow(this, SKU_GAS, RC_REQUEST,
+                mPurchaseFinishedListener, payload);
     }
 
     /**
@@ -238,18 +243,6 @@ public class donate extends Activity implements View.OnClickListener {
         return true;
     }
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-
-        // very important:
-        Log.d(TAG, "Destroying helper.");
-        if (mHelper != null) {
-            mHelper.dispose();
-            mHelper = null;
-        }
-    }
-
     void complain(String message) {
         Log.e(TAG, "**** Mafia Error: " + message);
         alert("Error: " + message);
@@ -263,65 +256,66 @@ public class donate extends Activity implements View.OnClickListener {
         bld.create().show();
     }
 
+    private class RegisterUser extends AsyncTask<String, Void, String> {
+        ProgressDialog loading;
+        addmafiaconnection ruc = new addmafiaconnection();
 
-    @Override
-    public void onClick(View v) {
-        switch (v.getId()) {
-            case R.id.twod:
-                Log.d(TAG, "Buy vip button clicked.");
 
-                Log.d(TAG, "Launching purchase flow for gas.");
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            loading = ProgressDialog.show(addvip.this, "Please Wait", null, true, true);
+            loading.setCanceledOnTouchOutside(false);
+        }
 
-        /* TODO: for security, generate your payload here for verification. See the comments on
-         *        verifyDeveloperPayload() for more info. Since this is a SAMPLE, we just use
-         *        an empty string, but on a production app you should carefully generate this. */
-                String payload = "";
+        @Override
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+            loading.dismiss();
+            try {
+                jObj = new JSONObject(result);
+            } catch (JSONException e) {
+                Log.e("JSON Parser", "Error parsing data " + e.toString());
+            }
 
-                mHelper.launchPurchaseFlow(this, SKU_TWO, RC_REQUEST,
-                        mPurchaseFinishedListener, payload);
-                break;
-            case R.id.fived:
-                Log.d(TAG, "Buy vip button clicked.");
+            try {
+                int success = jObj.getInt(TAG_SUCCESS);
 
-                Log.d(TAG, "Launching purchase flow for gas.");
+                if (success == 1) {
 
-        /* TODO: for security, generate your payload here for verification. See the comments on
-         *        verifyDeveloperPayload() for more info. Since this is a SAMPLE, we just use
-         *        an empty string, but on a production app you should carefully generate this. */
-                String payload1 = "";
+                    Toast.makeText(getApplicationContext(), "Code Added succesfully", Toast.LENGTH_LONG).show();
+                    mafia.getText().clear();
 
-                mHelper.launchPurchaseFlow(this, SKU_FIVE, RC_REQUEST,
-                        mPurchaseFinishedListener, payload1);
-                break;
-            case R.id.tend:
-                Log.d(TAG, "Buy vip button clicked.");
 
-                Log.d(TAG, "Launching purchase flow for gas.");
+                } else if (success == 2) {
+                    Toast.makeText(getApplicationContext(), "Already in top 100!!", Toast.LENGTH_LONG).show();
 
-        /* TODO: for security, generate your payload here for verification. See the comments on
-         *        verifyDeveloperPayload() for more info. Since this is a SAMPLE, we just use
-         *        an empty string, but on a production app you should carefully generate this. */
-                String payload2 = "";
 
-                mHelper.launchPurchaseFlow(this, SKU_TEN, RC_REQUEST,
-                        mPurchaseFinishedListener, payload2);
-                break;
-            case R.id.twd:
-                Log.d(TAG, "Buy vip button clicked.");
+                } else {
+                    // failed to create product
+                    Toast.makeText(getApplicationContext(), "Failed to add mafia", Toast.LENGTH_LONG).show();
+                }
 
-                Log.d(TAG, "Launching purchase flow for gas.");
-
-        /* TODO: for security, generate your payload here for verification. See the comments on
-         *        verifyDeveloperPayload() for more info. Since this is a SAMPLE, we just use
-         *        an empty string, but on a production app you should carefully generate this. */
-                String payload3 = "";
-
-                mHelper.launchPurchaseFlow(this, SKU_TWY, RC_REQUEST,
-                        mPurchaseFinishedListener, payload3);
-                break;
+            } catch (Exception e) {
+                e.printStackTrace();
+                Toast.makeText(getApplicationContext(), "Check network connection", Toast.LENGTH_SHORT).show();
+            }
 
 
         }
+
+        @Override
+        protected String doInBackground(String... params) {
+
+            HashMap<String, String> data = new HashMap<String, String>();
+            data.put("code", params[0]);
+            String result = ruc.sendPostRequest(REGISTER_URL, data);
+
+            return result;
+        }
+
     }
+
+
 }
 
